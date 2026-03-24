@@ -10,7 +10,7 @@
 - [x] 2.1 Create `src/config.ts` — read/write `config.json` and `credentials.json` with XDG-compliant paths
 - [x] 2.2 Create `src/commands/config.ts` — `wapi config get <key>` and `wapi config set <key> <value>`
 - [x] 2.3 Support `WAPI_SERVER_URL` env var override
-- [ ] 2.4 Write tests for config read/write, XDG path resolution, env var precedence
+- [x] 2.4 Write tests for config read/write, XDG path resolution, env var precedence
 
 ## 3. Init Command
 
@@ -22,7 +22,7 @@
 - [x] 3.6 Run `wrangler d1 migrations apply` against the remote database
 - [x] 3.7 Run `wrangler deploy` and capture the deployed URL
 - [x] 3.8 Save server URL to config, display CF Access setup instructions
-- [ ] 3.9 Write tests for template substitution and output parsing
+- [x] 3.9 Write tests for template substitution and output parsing
 
 ## 4. Auth Command
 
@@ -32,7 +32,7 @@
 - [x] 4.4 Implement polling loop: GET device code status every 2 seconds, handle approved/denied/expired
 - [x] 4.5 Store device token to `credentials.json` with `0600` permissions on success
 - [x] 4.6 Handle already-authenticated state: prompt to re-authenticate
-- [ ] 4.7 Write tests for polling state machine, credential storage
+- [x] 4.7 Write tests for polling state machine, credential storage
 
 ## 5. Devices + Status Commands
 
@@ -40,7 +40,7 @@
 - [x] 5.2 Implement `wapi devices revoke <name-or-id>` — find matching device, confirm, call revoke endpoint
 - [x] 5.3 Create `src/commands/status.ts` — display server URL, auth state, device info
 - [x] 5.4 Create `src/commands/logout.ts` — delete credentials file
-- [ ] 5.5 Write tests for device list formatting, revoke flow
+- [x] 5.5 Write tests for device list formatting, revoke flow
 
 ## 6. Command Wrapping
 
@@ -50,18 +50,18 @@
 - [x] 6.4 Implement exit code forwarding
 - [x] 6.5 Add authentication check before spawning
 - [x] 6.6 Add session capture stub message
-- [ ] 6.7 Write tests for signal forwarding and exit code passthrough
+- [x] 6.7 Write tests for signal forwarding and exit code passthrough
 
 ## 7. Server Integration
 
 - [x] 7.1 Create `src/api.ts` — HTTP client for WAPI server endpoints with device token auth header
 - [x] 7.2 Implement typed API methods: `createDeviceCode`, `pollDeviceCode`, `listDevices`, `revokeDevice`
 - [x] 7.3 Handle HTTP errors, timeouts, and unreachable server gracefully
-- [ ] 7.4 Write tests for API client with mocked HTTP responses
+- [x] 7.4 Write tests for API client with mocked HTTP responses
 
 ## 8. Build + Distribution
 
 - [x] 8.1 Configure `esbuild` or `tsup` to bundle CLI to a single file
 - [x] 8.2 Add `bin` field to `package.json` pointing to bundled output
-- [ ] 8.3 Test `npx wapi --help` works from outside the project
-- [ ] 8.4 Add `wapi` to root `package.json` scripts for convenience
+- [x] 8.3 Test `npx wapi --help` works from outside the project
+- [x] 8.4 Add `wapi` to root `package.json` scripts for convenience
