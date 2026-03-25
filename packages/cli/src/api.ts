@@ -77,6 +77,32 @@ export function createApiClient(serverUrl: string, deviceToken?: string) {
     async revokeDevice(machineId: string): Promise<void> {
       await request("POST", "/api/devices/revoke", { machineId });
     },
+
+    async createSession(data: {
+      title?: string;
+      agentType?: string;
+      machineId?: string;
+    }): Promise<{ id: string }> {
+      return request("POST", "/api/sessions", data);
+    },
+
+    async addMessage(
+      sessionId: string,
+      data: { role: string; content: string },
+    ): Promise<void> {
+      await request("POST", "/api/messages", { sessionId, ...data });
+    },
+
+    async updateSession(
+      sessionId: string,
+      data: { status?: string },
+    ): Promise<void> {
+      await request(
+        "POST",
+        `/api/sessions/${encodeURIComponent(sessionId)}`,
+        data,
+      );
+    },
   };
 }
 
