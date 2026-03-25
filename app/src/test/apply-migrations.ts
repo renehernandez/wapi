@@ -14,6 +14,7 @@ export async function applyMigrations() {
     id text PRIMARY KEY NOT NULL,
     email text NOT NULL,
     display_name text,
+    seq integer DEFAULT 0 NOT NULL,
     created_at text NOT NULL,
     updated_at text NOT NULL
   )`);
@@ -45,4 +46,38 @@ export async function applyMigrations() {
     created_at text NOT NULL,
     FOREIGN KEY (account_id) REFERENCES accounts(id)
   )`);
+
+  await db.run(sql`CREATE TABLE IF NOT EXISTS sessions (
+    id text PRIMARY KEY NOT NULL,
+    account_id text NOT NULL,
+    title text,
+    agent_type text,
+    machine_id text,
+    status text NOT NULL,
+    metadata text,
+    version integer DEFAULT 1 NOT NULL,
+    seq integer NOT NULL,
+    created_at text NOT NULL,
+    updated_at text NOT NULL,
+    FOREIGN KEY (account_id) REFERENCES accounts(id),
+    FOREIGN KEY (machine_id) REFERENCES machines(id)
+  )`);
+  await db.run(
+    sql`CREATE INDEX IF NOT EXISTS sessions_account_id_idx ON sessions (account_id)`,
+  );
+
+  await db.run(sql`CREATE TABLE IF NOT EXISTS session_messages (
+    id text PRIMARY KEY NOT NULL,
+    session_id text NOT NULL,
+    seq integer NOT NULL,
+    role text NOT NULL,
+    content text NOT NULL,
+    metadata text,
+    account_seq integer NOT NULL,
+    created_at text NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+  )`);
+  await db.run(
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS session_messages_session_seq_unique ON session_messages (session_id, seq)`,
+  );
 }
