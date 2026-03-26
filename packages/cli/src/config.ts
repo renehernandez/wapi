@@ -35,6 +35,14 @@ export interface Credentials {
   machineName: string;
 }
 
+export interface DeploymentState {
+  accountId?: string;
+  d1DatabaseId?: string;
+  kvNamespaceId?: string;
+  workerName?: string;
+  workerUrl?: string;
+}
+
 export function getConfigPath(): string {
   return join(getConfigDir(), "config.json");
 }
@@ -70,6 +78,23 @@ export function deleteCredentials() {
   } catch {
     // Already gone
   }
+}
+
+export function getDeploymentPath(): string {
+  return join(getConfigDir(), "deployment.json");
+}
+
+export function readDeployment(): DeploymentState {
+  return readJson<DeploymentState>(getDeploymentPath()) ?? {};
+}
+
+export function writeDeployment(state: DeploymentState) {
+  writeJson(getDeploymentPath(), state);
+}
+
+export function updateDeployment(updates: Partial<DeploymentState>) {
+  const current = readDeployment();
+  writeDeployment({ ...current, ...updates });
 }
 
 export function getServerUrl(): string | null {

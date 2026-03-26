@@ -78,6 +78,56 @@ describe("config", () => {
   });
 });
 
+describe("deployment state", () => {
+  it("reads empty deployment when no file exists", async () => {
+    const { readDeployment } = await loadConfig();
+    expect(readDeployment()).toEqual({});
+  });
+
+  it("writes and reads deployment state", async () => {
+    const { writeDeployment, readDeployment } = await loadConfig();
+    writeDeployment({
+      accountId: "abc123",
+      d1DatabaseId: "db-456",
+      kvNamespaceId: "kv-789",
+    });
+    expect(readDeployment()).toEqual({
+      accountId: "abc123",
+      d1DatabaseId: "db-456",
+      kvNamespaceId: "kv-789",
+    });
+  });
+
+  it("updateDeployment merges with existing", async () => {
+    const { writeDeployment, updateDeployment, readDeployment } =
+      await loadConfig();
+    writeDeployment({ accountId: "abc123", d1DatabaseId: "db-456" });
+    updateDeployment({ kvNamespaceId: "kv-789", workerUrl: "https://w.dev" });
+    expect(readDeployment()).toEqual({
+      accountId: "abc123",
+      d1DatabaseId: "db-456",
+      kvNamespaceId: "kv-789",
+      workerUrl: "https://w.dev",
+    });
+  });
+
+  it("updateDeployment overwrites individual fields", async () => {
+    const { writeDeployment, updateDeployment, readDeployment } =
+      await loadConfig();
+    writeDeployment({ accountId: "old", d1DatabaseId: "db-1" });
+    updateDeployment({ accountId: "new" });
+    expect(readDeployment()).toEqual({
+      accountId: "new",
+      d1DatabaseId: "db-1",
+    });
+  });
+
+  it("stores deployment path under config dir", async () => {
+    const { getDeploymentPath } = await loadConfig();
+    expect(getDeploymentPath()).toBe(join(tempDir, "wapi", "deployment.json"));
+  });
+});
+
 describe("getServerUrl", () => {
   it("returns env var when set", async () => {
     vi.stubEnv("WAPI_SERVER_URL", "https://env.workers.dev");

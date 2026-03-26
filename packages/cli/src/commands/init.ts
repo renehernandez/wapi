@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import consola from "consola";
 import { execaCommand } from "execa";
 import open from "open";
-import { updateConfig } from "../config";
+import { readDeployment, updateConfig, updateDeployment } from "../config";
 import { scaffoldDeployDir } from "../deploy/scaffold";
 
 const WRANGLER = "npx wrangler@4";
@@ -117,6 +117,8 @@ export default defineCommand({
   async run({ args }) {
     consola.info("Setting up WAPI on your Cloudflare account...\n");
 
+    const state = readDeployment();
+
     // Step 1: Check wrangler
     if (!(await checkWrangler())) {
       consola.error(
@@ -132,8 +134,9 @@ export default defineCommand({
 
     consola.success("Wrangler authenticated");
 
-    // Resolve account ID
-    let accountId = args.accountId || process.env.CLOUDFLARE_ACCOUNT_ID;
+    // Resolve account ID (prefer arg > env > saved state > detect)
+    let accountId =
+      args.accountId || process.env.CLOUDFLARE_ACCOUNT_ID || state.accountId;
     if (!accountId) {
       const accounts = await detectAccounts();
       if (accounts.length === 0) {
@@ -166,41 +169,79 @@ export default defineCommand({
     }
 
     const env = wranglerEnv(accountId);
+    updateDeployment({ accountId });
 
-    // Step 2: Create D1 database
-    consola.start("Creating D1 database...");
-    let d1Id: string;
-    try {
-      await execaCommand(`${WRANGLER} d1 create wapi-db`, { env });
-      const id = await findD1Id("wapi-db", env);
-      if (!id) {
-        consola.error("D1 database created but could not find its ID.");
-        process.exit(1);
+    // Step 2: Ensure D1 database exists
+    let d1Id: string | undefined = state.d1DatabaseId;
+    if (d1Id) {
+      // Verify it still exists on the account
+      const verified = await findD1Id("wapi-db", env);
+      if (verified) {
+        consola.success(`D1 database already exists: ${d1Id}`);
+      } else {
+        consola.warn("Saved D1 ID not found on account, creating new one...");
+        d1Id = undefined;
       }
-      d1Id = id;
-      consola.success(`D1 database created: ${d1Id}`);
-    } catch (err) {
-      consola.error(`Failed to create D1 database: ${String(err)}`);
-      process.exit(1);
     }
+    if (!d1Id) {
+      // Check if it exists but wasn't saved
+      d1Id = (await findD1Id("wapi-db", env)) ?? undefined;
+      if (d1Id) {
+        consola.success(`Found existing D1 database: ${d1Id}`);
+      } else {
+        consola.start("Creating D1 database...");
+        try {
+          await execaCommand(`${WRANGLER} d1 create wapi-db`, { env });
+          d1Id = (await findD1Id("wapi-db", env)) ?? undefined;
+          if (!d1Id) {
+            consola.error("D1 database created but could not find its ID.");
+            process.exit(1);
+          }
+          consola.success(`D1 database created: ${d1Id}`);
+        } catch (err) {
+          consola.error(`Failed to create D1 database: ${String(err)}`);
+          process.exit(1);
+        }
+      }
+    }
+    updateDeployment({ d1DatabaseId: d1Id });
 
-    // Step 3: Create KV namespace
-    consola.start("Creating KV namespace...");
-    let kvId: string;
-    try {
-      await execaCommand(`${WRANGLER} kv namespace create wapi-kv`, { env });
-      const id = await findKvId("wapi-kv", env);
-      if (!id) {
-        consola.error("KV namespace created but could not find its ID.");
-        process.exit(1);
+    // Step 3: Ensure KV namespace exists
+    let kvId: string | undefined = state.kvNamespaceId;
+    if (kvId) {
+      const verified = await findKvId("wapi-kv", env);
+      if (verified) {
+        consola.success(`KV namespace already exists: ${kvId}`);
+      } else {
+        consola.warn(
+          "Saved KV namespace ID not found on account, creating new one...",
+        );
+        kvId = undefined;
       }
-      kvId = id;
-      consola.success(`KV namespace created: ${kvId}`);
-    } catch (err) {
-      consola.error(`Failed to create KV namespace: ${String(err)}`);
-      consola.warn(`Resources created so far: D1 database (${d1Id})`);
-      process.exit(1);
     }
+    if (!kvId) {
+      kvId = (await findKvId("wapi-kv", env)) ?? undefined;
+      if (kvId) {
+        consola.success(`Found existing KV namespace: ${kvId}`);
+      } else {
+        consola.start("Creating KV namespace...");
+        try {
+          await execaCommand(`${WRANGLER} kv namespace create wapi-kv`, {
+            env,
+          });
+          kvId = (await findKvId("wapi-kv", env)) ?? undefined;
+          if (!kvId) {
+            consola.error("KV namespace created but could not find its ID.");
+            process.exit(1);
+          }
+          consola.success(`KV namespace created: ${kvId}`);
+        } catch (err) {
+          consola.error(`Failed to create KV namespace: ${String(err)}`);
+          process.exit(1);
+        }
+      }
+    }
+    updateDeployment({ kvNamespaceId: kvId });
 
     // Step 4: Scaffold temp dir and deploy
     consola.start("Preparing deployment...");
@@ -214,7 +255,6 @@ export default defineCommand({
       consola.error(
         `Failed to prepare deployment: ${err instanceof Error ? err.message : String(err)}`,
       );
-      consola.warn(`Resources created: D1 (${d1Id}), KV (${kvId})`);
       process.exit(1);
     }
 
@@ -239,15 +279,16 @@ export default defineCommand({
     } catch (err) {
       consola.error(`Deployment failed: ${String(err)}`);
       consola.warn(
-        `Resources created: D1 (${d1Id}), KV (${kvId}). You may need to clean these up manually in the Cloudflare dashboard.`,
+        "You may need to clean up resources manually in the Cloudflare dashboard.",
       );
     } finally {
       scaffold.cleanup();
     }
 
-    // Step 6: Save config
+    // Step 6: Save config + deployment state
     if (deployUrl) {
       updateConfig({ serverUrl: deployUrl });
+      updateDeployment({ workerName: "wapi", workerUrl: deployUrl });
       consola.success(`Server URL saved: ${deployUrl}`);
     }
 
