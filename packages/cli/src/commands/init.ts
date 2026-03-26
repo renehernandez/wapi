@@ -5,9 +5,11 @@ import open from "open";
 import { updateConfig } from "../config";
 import { scaffoldDeployDir } from "../deploy/scaffold";
 
+const WRANGLER = "npx wrangler";
+
 async function checkWrangler(): Promise<boolean> {
   try {
-    await execaCommand("wrangler --version");
+    await execaCommand(`${WRANGLER} --version`);
     return true;
   } catch {
     return false;
@@ -16,7 +18,7 @@ async function checkWrangler(): Promise<boolean> {
 
 async function checkWranglerAuth(): Promise<boolean> {
   try {
-    const result = await execaCommand("wrangler whoami");
+    const result = await execaCommand(`${WRANGLER} whoami`);
     return !result.stdout.includes("not authenticated");
   } catch {
     return false;
@@ -56,7 +58,7 @@ export default defineCommand({
     }
 
     if (!(await checkWranglerAuth())) {
-      consola.error("Not logged in to Cloudflare.\nRun: wrangler login");
+      consola.error(`Not logged in to Cloudflare.\nRun: ${WRANGLER} login`);
       process.exit(1);
     }
 
@@ -66,7 +68,7 @@ export default defineCommand({
     consola.start("Creating D1 database...");
     let d1Id: string;
     try {
-      const result = await execaCommand("wrangler d1 create wapi-db");
+      const result = await execaCommand(`${WRANGLER} d1 create wapi-db`);
       const parsed = parseD1Id(result.stdout + result.stderr);
       if (!parsed) {
         consola.error("Failed to parse D1 database ID from output:");
@@ -84,7 +86,9 @@ export default defineCommand({
     consola.start("Creating KV namespace...");
     let kvId: string;
     try {
-      const result = await execaCommand("wrangler kv namespace create wapi-kv");
+      const result = await execaCommand(
+        `${WRANGLER} kv namespace create wapi-kv`,
+      );
       const parsed = parseKvId(result.stdout + result.stderr);
       if (!parsed) {
         consola.error("Failed to parse KV namespace ID from output:");
@@ -118,7 +122,7 @@ export default defineCommand({
     let deployUrl: string | null = null;
     try {
       consola.start("Deploying Worker...");
-      const deployResult = await execaCommand("wrangler deploy", {
+      const deployResult = await execaCommand(`${WRANGLER} deploy`, {
         cwd: scaffold.dir,
       });
       deployUrl = parseDeployUrl(deployResult.stdout + deployResult.stderr);
@@ -126,7 +130,7 @@ export default defineCommand({
 
       // Step 5: Apply migrations
       consola.start("Applying D1 migrations...");
-      await execaCommand("wrangler d1 migrations apply wapi-db --remote", {
+      await execaCommand(`${WRANGLER} d1 migrations apply wapi-db --remote`, {
         cwd: scaffold.dir,
         stdin: "inherit",
       });
