@@ -1,3 +1,4 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { authenticateRequest } from "~/server/auth/api-auth";
 import { addMessage, listMessages } from "~/server/functions/messages";
 import { getDb } from "~/server/lib/db";
@@ -89,3 +90,12 @@ export async function handlePostMessages(request: Request): Promise<Response> {
     throw err;
   }
 }
+
+export const Route = createFileRoute("/api/messages/")({
+  server: {
+    handlers: {
+      GET: ({ request }) => handleGetMessages(request),
+      POST: ({ request }) => handlePostMessages(request),
+    },
+  },
+});

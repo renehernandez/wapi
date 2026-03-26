@@ -1,3 +1,4 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { authenticateRequest } from "~/server/auth/api-auth";
 import { getChanges } from "~/server/functions/sync";
 import { getDb } from "~/server/lib/db";
@@ -32,3 +33,11 @@ export async function handleGetSync(request: Request): Promise<Response> {
   const changes = await getChanges(identity.accountId, sinceSeq, db, r2);
   return Response.json(changes);
 }
+
+export const Route = createFileRoute("/api/sync/")({
+  server: {
+    handlers: {
+      GET: ({ request }) => handleGetSync(request),
+    },
+  },
+});

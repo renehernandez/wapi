@@ -1,3 +1,4 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { authenticateRequest } from "~/server/auth/api-auth";
 import { createSession, listSessions } from "~/server/functions/sessions";
 import { getDb } from "~/server/lib/db";
@@ -60,3 +61,12 @@ export async function handlePostSessions(request: Request): Promise<Response> {
   );
   return Response.json(session, { status: 201 });
 }
+
+export const Route = createFileRoute("/api/sessions/")({
+  server: {
+    handlers: {
+      GET: ({ request }) => handleGetSessions(request),
+      POST: ({ request }) => handlePostSessions(request),
+    },
+  },
+});

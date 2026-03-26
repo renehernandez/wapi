@@ -1,3 +1,4 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { authenticateRequest } from "~/server/auth/api-auth";
 import { updateSession } from "~/server/functions/sessions";
 import { getDb } from "~/server/lib/db";
@@ -50,3 +51,11 @@ export async function handlePostSession(
     throw err;
   }
 }
+
+export const Route = createFileRoute("/api/sessions/$id")({
+  server: {
+    handlers: {
+      POST: ({ request, params }) => handlePostSession(request, params.id),
+    },
+  },
+});
