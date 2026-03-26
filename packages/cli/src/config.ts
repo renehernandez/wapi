@@ -42,6 +42,7 @@ export interface DeploymentState {
   r2BucketName?: string;
   workerName?: string;
   workerUrl?: string;
+  customDomain?: string;
 }
 
 export function getConfigPath(): string {

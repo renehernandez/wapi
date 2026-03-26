@@ -1,9 +1,16 @@
+import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { defineCommand } from "citty";
 import consola from "consola";
 import { execaCommand } from "execa";
 import open from "open";
+import { getMigrationsPath, getWorkerBundlePath } from "../bundle";
 import { readDeployment, updateConfig, updateDeployment } from "../config";
-import { scaffoldDeployDir } from "../deploy/scaffold";
+import {
+  generateWranglerConfig,
+  needsProvisioning,
+  patchWranglerConfig,
+} from "../deploy/scaffold";
 
 const WRANGLER = "npx wrangler@4";
 
@@ -125,6 +132,10 @@ export default defineCommand({
       description:
         "Cloudflare account ID (required if you have multiple accounts)",
     },
+    domain: {
+      type: "string",
+      description: "Custom domain for the Worker (e.g., wapi.fullscript.cloud)",
+    },
   },
   async run({ args }) {
     consola.info("Setting up WAPI on your Cloudflare account...\n");
@@ -183,79 +194,103 @@ export default defineCommand({
     const env = wranglerEnv(accountId);
     updateDeployment({ accountId });
 
-    // Step 2: Ensure D1 database exists
-    let d1Id: string | undefined = state.d1DatabaseId;
-    if (d1Id) {
-      // Verify it still exists on the account
-      const verified = await findD1Id("wapi-db", env);
-      if (verified) {
-        consola.success(`D1 database already exists: ${d1Id}`);
-      } else {
-        consola.warn("Saved D1 ID not found on account, creating new one...");
-        d1Id = undefined;
-      }
+    // Step 2: Scaffold — generate wrangler.jsonc if it doesn't exist
+    const wranglerConfigPath = join(process.cwd(), "wrangler.jsonc");
+    if (!existsSync(wranglerConfigPath)) {
+      generateWranglerConfig(process.cwd(), {
+        domain: args.domain || undefined,
+      });
+      consola.success("Generated wrangler.jsonc");
+    } else {
+      consola.info("Using existing wrangler.jsonc");
     }
-    if (!d1Id) {
-      // Check if it exists but wasn't saved
-      d1Id = (await findD1Id("wapi-db", env)) ?? undefined;
+
+    // Step 3: Provision — create resources and patch IDs into wrangler.jsonc
+    const provisioning = needsProvisioning(wranglerConfigPath);
+
+    // D1 database
+    let d1Id: string | undefined = state.d1DatabaseId;
+    if (provisioning.d1) {
       if (d1Id) {
-        consola.success(`Found existing D1 database: ${d1Id}`);
-      } else {
-        consola.start("Creating D1 database...");
-        try {
-          await execaCommand(`${WRANGLER} d1 create wapi-db`, { env });
-          d1Id = (await findD1Id("wapi-db", env)) ?? undefined;
-          if (!d1Id) {
-            consola.error("D1 database created but could not find its ID.");
-            process.exit(1);
-          }
-          consola.success(`D1 database created: ${d1Id}`);
-        } catch (err) {
-          consola.error(`Failed to create D1 database: ${String(err)}`);
-          process.exit(1);
+        const verified = await findD1Id("wapi-db", env);
+        if (verified) {
+          consola.success(`D1 database already exists: ${d1Id}`);
+          patchWranglerConfig(wranglerConfigPath, { d1DatabaseId: d1Id });
+        } else {
+          consola.warn("Saved D1 ID not found on account, creating new one...");
+          d1Id = undefined;
         }
       }
+      if (!d1Id) {
+        d1Id = (await findD1Id("wapi-db", env)) ?? undefined;
+        if (d1Id) {
+          consola.success(`Found existing D1 database: ${d1Id}`);
+        } else {
+          consola.start("Creating D1 database...");
+          try {
+            await execaCommand(`${WRANGLER} d1 create wapi-db`, { env });
+            d1Id = (await findD1Id("wapi-db", env)) ?? undefined;
+            if (!d1Id) {
+              consola.error("D1 database created but could not find its ID.");
+              process.exit(1);
+            }
+            consola.success(`D1 database created: ${d1Id}`);
+          } catch (err) {
+            consola.error(`Failed to create D1 database: ${String(err)}`);
+            process.exit(1);
+          }
+        }
+        patchWranglerConfig(wranglerConfigPath, { d1DatabaseId: d1Id });
+      }
+    } else {
+      consola.success("D1 database ID already configured");
     }
     updateDeployment({ d1DatabaseId: d1Id });
 
-    // Step 3: Ensure KV namespace exists
+    // KV namespace
     let kvId: string | undefined = state.kvNamespaceId;
-    if (kvId) {
-      const verified = await findKvId("wapi-kv", env);
-      if (verified) {
-        consola.success(`KV namespace already exists: ${kvId}`);
-      } else {
-        consola.warn(
-          "Saved KV namespace ID not found on account, creating new one...",
-        );
-        kvId = undefined;
-      }
-    }
-    if (!kvId) {
-      kvId = (await findKvId("wapi-kv", env)) ?? undefined;
+    if (provisioning.kv) {
       if (kvId) {
-        consola.success(`Found existing KV namespace: ${kvId}`);
-      } else {
-        consola.start("Creating KV namespace...");
-        try {
-          await execaCommand(`${WRANGLER} kv namespace create wapi-kv`, {
-            env,
-          });
-          kvId = (await findKvId("wapi-kv", env)) ?? undefined;
-          if (!kvId) {
-            consola.error("KV namespace created but could not find its ID.");
-            process.exit(1);
-          }
-          consola.success(`KV namespace created: ${kvId}`);
-        } catch (err) {
-          consola.error(`Failed to create KV namespace: ${String(err)}`);
-          process.exit(1);
+        const verified = await findKvId("wapi-kv", env);
+        if (verified) {
+          consola.success(`KV namespace already exists: ${kvId}`);
+          patchWranglerConfig(wranglerConfigPath, { kvNamespaceId: kvId });
+        } else {
+          consola.warn(
+            "Saved KV namespace ID not found on account, creating new one...",
+          );
+          kvId = undefined;
         }
       }
+      if (!kvId) {
+        kvId = (await findKvId("wapi-kv", env)) ?? undefined;
+        if (kvId) {
+          consola.success(`Found existing KV namespace: ${kvId}`);
+        } else {
+          consola.start("Creating KV namespace...");
+          try {
+            await execaCommand(`${WRANGLER} kv namespace create wapi-kv`, {
+              env,
+            });
+            kvId = (await findKvId("wapi-kv", env)) ?? undefined;
+            if (!kvId) {
+              consola.error("KV namespace created but could not find its ID.");
+              process.exit(1);
+            }
+            consola.success(`KV namespace created: ${kvId}`);
+          } catch (err) {
+            consola.error(`Failed to create KV namespace: ${String(err)}`);
+            process.exit(1);
+          }
+        }
+        patchWranglerConfig(wranglerConfigPath, { kvNamespaceId: kvId });
+      }
+    } else {
+      consola.success("KV namespace ID already configured");
     }
     updateDeployment({ kvNamespaceId: kvId });
 
-    // Step 3b: Ensure R2 bucket exists
+    // R2 bucket
     let r2BucketName: string | undefined = state.r2BucketName;
     if (r2BucketName) {
       const exists = await findR2Bucket(r2BucketName, env);
@@ -289,18 +324,20 @@ export default defineCommand({
     }
     updateDeployment({ r2BucketName });
 
-    // Step 4: Scaffold temp dir and deploy
-    consola.start("Preparing deployment...");
-    let scaffold: ReturnType<typeof scaffoldDeployDir>;
+    // Step 4: Deploy — copy bundled Worker + migrations, then run wrangler deploy
+    consola.start("Preparing deployment artifacts...");
     try {
-      scaffold = scaffoldDeployDir({
-        d1DatabaseId: d1Id,
-        kvNamespaceId: kvId,
-        r2BucketName,
-      });
+      const workerBundlePath = getWorkerBundlePath();
+      const distTarget = join(process.cwd(), "dist");
+      cpSync(workerBundlePath, distTarget, { recursive: true });
+
+      const migrationsSource = getMigrationsPath();
+      const migrationsTarget = join(process.cwd(), "migrations");
+      mkdirSync(migrationsTarget, { recursive: true });
+      cpSync(migrationsSource, migrationsTarget, { recursive: true });
     } catch (err) {
       consola.error(
-        `Failed to prepare deployment: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to copy deployment artifacts: ${err instanceof Error ? err.message : String(err)}`,
       );
       process.exit(1);
     }
@@ -309,7 +346,7 @@ export default defineCommand({
     try {
       consola.start("Deploying Worker...");
       const deployResult = await execaCommand(`${WRANGLER} deploy`, {
-        cwd: scaffold.dir,
+        cwd: process.cwd(),
         env,
       });
       deployUrl = parseDeployUrl(deployResult.stdout + deployResult.stderr);
@@ -318,7 +355,7 @@ export default defineCommand({
       // Step 5: Apply migrations
       consola.start("Applying D1 migrations...");
       await execaCommand(`${WRANGLER} d1 migrations apply wapi-db --remote`, {
-        cwd: scaffold.dir,
+        cwd: process.cwd(),
         env,
         stdin: "inherit",
       });
@@ -328,25 +365,34 @@ export default defineCommand({
       consola.warn(
         "You may need to clean up resources manually in the Cloudflare dashboard.",
       );
-    } finally {
-      scaffold.cleanup();
     }
 
     // Step 6: Save config + deployment state
-    if (deployUrl) {
-      updateConfig({ serverUrl: deployUrl });
-      updateDeployment({ workerName: "wapi", workerUrl: deployUrl });
-      consola.success(`Server URL saved: ${deployUrl}`);
+    // Prefer custom domain over workers.dev URL when available
+    const customDomain = args.domain || undefined;
+    const serverUrl = customDomain
+      ? `https://${customDomain}`
+      : (deployUrl ?? undefined);
+
+    if (serverUrl) {
+      updateConfig({ serverUrl });
+      updateDeployment({
+        workerName: "wapi",
+        workerUrl: deployUrl ?? undefined,
+        customDomain,
+      });
+      consola.success(`Server URL saved: ${serverUrl}`);
     }
 
     // Step 7: CF Access instructions
+    const displayUrl = serverUrl || deployUrl || "<your-worker-url>";
     console.log("\n──────────────────────────────────────────");
     console.log("  Next: Configure Cloudflare Access");
     console.log("──────────────────────────────────────────\n");
     console.log("  1. Open Cloudflare Zero Trust dashboard");
     console.log("  2. Go to Access > Applications > Add Application");
     console.log('  3. Select "Self-hosted"');
-    console.log(`  4. Set domain: ${deployUrl || "<your-worker-url>"}`);
+    console.log(`  4. Set domain: ${displayUrl}`);
     console.log("  5. Add an identity provider (One-time PIN, Google, etc.)");
     console.log("  6. Create a policy for your email\n");
 
