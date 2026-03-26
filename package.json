@@ -4,7 +4,8 @@
   "packageManager": "pnpm@10.7.0",
   "scripts": {
     "dev": "pnpm --filter app dev",
-    "build": "pnpm --filter app build",
+    "build": "tsx scripts/build.ts",
+    "build:app": "pnpm --filter app build",
     "deploy": "pnpm --filter app deploy:cf",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

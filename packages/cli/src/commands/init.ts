@@ -1,14 +1,23 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { defineCommand } from "citty";
 import consola from "consola";
 import { execaCommand } from "execa";
+import open from "open";
 import { updateConfig } from "../config";
+import { scaffoldDeployDir } from "../deploy/scaffold";
 
-async function checkWrangler() {
+async function checkWrangler(): Promise<boolean> {
   try {
     await execaCommand("wrangler --version");
     return true;
+  } catch {
+    return false;
+  }
+}
+
+async function checkWranglerAuth(): Promise<boolean> {
+  try {
+    const result = await execaCommand("wrangler whoami");
+    return !result.stdout.includes("not authenticated");
   } catch {
     return false;
   }
@@ -32,36 +41,32 @@ function parseDeployUrl(output: string): string | null {
 export default defineCommand({
   meta: {
     name: "init",
-    description: "Provision Cloudflare resources and deploy WAPI",
+    description:
+      "Deploy WAPI to your Cloudflare account (no repo clone needed)",
   },
-  args: {
-    dir: {
-      type: "string",
-      description: "Path to the WAPI project directory",
-      default: ".",
-    },
-  },
-  async run({ args }) {
-    const projectDir = resolve(args.dir);
-    const appDir = resolve(projectDir, "app");
+  async run() {
+    consola.info("Setting up WAPI on your Cloudflare account...\n");
 
-    // Check wrangler
+    // Step 1: Check wrangler
     if (!(await checkWrangler())) {
       consola.error(
-        "wrangler is not installed. Install it with: npm install -g wrangler",
+        "wrangler is required but not found.\nInstall: npm install -g wrangler",
       );
       process.exit(1);
     }
 
-    consola.info("Provisioning WAPI on your Cloudflare account...\n");
+    if (!(await checkWranglerAuth())) {
+      consola.error("Not logged in to Cloudflare.\nRun: wrangler login");
+      process.exit(1);
+    }
 
-    // Create D1 database
+    consola.success("Wrangler authenticated");
+
+    // Step 2: Create D1 database
     consola.start("Creating D1 database...");
     let d1Id: string;
     try {
-      const result = await execaCommand("wrangler d1 create wapi-db", {
-        cwd: appDir,
-      });
+      const result = await execaCommand("wrangler d1 create wapi-db");
       const parsed = parseD1Id(result.stdout + result.stderr);
       if (!parsed) {
         consola.error("Failed to parse D1 database ID from output:");
@@ -71,18 +76,15 @@ export default defineCommand({
       d1Id = parsed;
       consola.success(`D1 database created: ${d1Id}`);
     } catch (err) {
-      consola.error("Failed to create D1 database:", String(err));
+      consola.error(`Failed to create D1 database: ${String(err)}`);
       process.exit(1);
     }
 
-    // Create KV namespace
+    // Step 3: Create KV namespace
     consola.start("Creating KV namespace...");
     let kvId: string;
     try {
-      const result = await execaCommand(
-        "wrangler kv namespace create wapi-kv",
-        { cwd: appDir },
-      );
+      const result = await execaCommand("wrangler kv namespace create wapi-kv");
       const parsed = parseKvId(result.stdout + result.stderr);
       if (!parsed) {
         consola.error("Failed to parse KV namespace ID from output:");
@@ -92,75 +94,78 @@ export default defineCommand({
       kvId = parsed;
       consola.success(`KV namespace created: ${kvId}`);
     } catch (err) {
-      consola.error("Failed to create KV namespace:", String(err));
+      consola.error(`Failed to create KV namespace: ${String(err)}`);
+      consola.warn(`Resources created so far: D1 database (${d1Id})`);
       process.exit(1);
     }
 
-    // Generate wrangler.jsonc from template
-    consola.start("Generating wrangler.jsonc...");
-    const templatePath = resolve(appDir, "wrangler.template.jsonc");
-    const outputPath = resolve(appDir, "wrangler.jsonc");
+    // Step 4: Scaffold temp dir and deploy
+    consola.start("Preparing deployment...");
+    let scaffold: ReturnType<typeof scaffoldDeployDir>;
     try {
-      let template = readFileSync(templatePath, "utf-8");
-      template = template.replace("DATABASE_ID_PLACEHOLDER", d1Id);
-      template = template.replace("KV_ID_PLACEHOLDER", kvId);
-      writeFileSync(outputPath, template);
-      consola.success("wrangler.jsonc generated");
+      scaffold = scaffoldDeployDir({
+        d1DatabaseId: d1Id,
+        kvNamespaceId: kvId,
+      });
     } catch (err) {
-      consola.error("Failed to generate wrangler.jsonc:", String(err));
+      consola.error(
+        `Failed to prepare deployment: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      consola.warn(`Resources created: D1 (${d1Id}), KV (${kvId})`);
       process.exit(1);
     }
 
-    // Apply migrations
-    consola.start("Applying D1 migrations...");
+    let deployUrl: string | null = null;
     try {
+      consola.start("Deploying Worker...");
+      const deployResult = await execaCommand("wrangler deploy", {
+        cwd: scaffold.dir,
+      });
+      deployUrl = parseDeployUrl(deployResult.stdout + deployResult.stderr);
+      consola.success(`Deployed to ${deployUrl || "Cloudflare Workers"}`);
+
+      // Step 5: Apply migrations
+      consola.start("Applying D1 migrations...");
       await execaCommand("wrangler d1 migrations apply wapi-db --remote", {
-        cwd: appDir,
+        cwd: scaffold.dir,
         stdin: "inherit",
       });
       consola.success("Migrations applied");
     } catch (err) {
-      consola.error("Failed to apply migrations:", String(err));
-      process.exit(1);
+      consola.error(`Deployment failed: ${String(err)}`);
+      consola.warn(
+        `Resources created: D1 (${d1Id}), KV (${kvId}). You may need to clean these up manually in the Cloudflare dashboard.`,
+      );
+    } finally {
+      scaffold.cleanup();
     }
 
-    // Deploy
-    consola.start("Deploying Worker...");
-    let deployUrl: string | null = null;
-    try {
-      await execaCommand("pnpm run build", { cwd: appDir });
-      const deployResult = await execaCommand("wrangler deploy", {
-        cwd: appDir,
-      });
-      deployUrl = parseDeployUrl(deployResult.stdout + deployResult.stderr);
-      consola.success(`Deployed to ${deployUrl || "Cloudflare Workers"}`);
-    } catch (err) {
-      consola.error("Failed to deploy:", String(err));
-      process.exit(1);
-    }
-
-    // Save config
+    // Step 6: Save config
     if (deployUrl) {
       updateConfig({ serverUrl: deployUrl });
       consola.success(`Server URL saved: ${deployUrl}`);
     }
 
-    // CF Access instructions
-    console.log("\n──────────────────────────────────────");
-    console.log("Next step: Configure Cloudflare Access");
-    console.log("──────────────────────────────────────\n");
-    console.log("1. Go to https://one.dash.cloudflare.com");
-    console.log("2. Navigate to Access > Applications > Add an Application");
-    console.log('3. Select "Self-hosted"');
+    // Step 7: CF Access instructions
+    console.log("\n──────────────────────────────────────────");
+    console.log("  Next: Configure Cloudflare Access");
+    console.log("──────────────────────────────────────────\n");
+    console.log("  1. Open Cloudflare Zero Trust dashboard");
+    console.log("  2. Go to Access > Applications > Add Application");
+    console.log('  3. Select "Self-hosted"');
+    console.log(`  4. Set domain: ${deployUrl || "<your-worker-url>"}`);
+    console.log("  5. Add an identity provider (One-time PIN, Google, etc.)");
+    console.log("  6. Create a policy for your email\n");
+
+    try {
+      await open("https://one.dash.cloudflare.com");
+      consola.info("Opened Cloudflare Zero Trust dashboard in your browser.");
+    } catch {
+      consola.info("Open https://one.dash.cloudflare.com to set up Access.");
+    }
+
     console.log(
-      `4. Set the Application Domain to: ${deployUrl || "<your-worker-url>"}`,
-    );
-    console.log(
-      "5. Configure an identity provider (One-time PIN, Google, GitHub, etc.)",
-    );
-    console.log("6. Create a policy to allow your email/domain\n");
-    console.log(
-      'Once configured, run "wapi auth" to authenticate this device.',
+      '\nOnce Access is configured, run "wapi auth" to authenticate.\n',
     );
   },
 });
