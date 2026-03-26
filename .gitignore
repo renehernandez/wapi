@@ -142,5 +142,8 @@ vite.config.ts.timestamp-*
 .wrangler/
 .dev.vars
 
+# Deploy artifacts (copied by wapi init)
+/migrations/
+
 # Generated
 *.gen.ts

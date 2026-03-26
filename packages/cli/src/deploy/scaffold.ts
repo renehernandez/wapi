@@ -7,6 +7,8 @@ interface WranglerConfig {
   compatibility_date?: string;
   compatibility_flags?: string[];
   main?: string;
+  no_bundle?: boolean;
+  assets?: { directory: string };
   observability?: { enabled: boolean };
   d1_databases?: Array<{
     binding: string;
@@ -36,7 +38,9 @@ export function defaultWranglerConfig(options?: {
     name: "wapi",
     compatibility_date: "2026-03-17",
     compatibility_flags: ["nodejs_compat"],
-    main: "dist/@tanstack/react-start/server-entry",
+    main: "dist/server/index.js",
+    no_bundle: true,
+    assets: { directory: "dist/client" },
     observability: { enabled: true },
     d1_databases: [
       {

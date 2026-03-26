@@ -1,0 +1,17 @@
+[tools]
+node = "24.14.0"
+lefthook = "2.0.13"
+
+[tasks.install]
+description = "Install dependencies and set up local development"
+run = """
+pnpm install
+lefthook install
+"""
+
+[tasks.init]
+description = "Build and run wapi init to deploy to Cloudflare"
+run = """
+pnpm build
+pnpm wapi -- init "$@"
+"""

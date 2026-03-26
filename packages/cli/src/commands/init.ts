@@ -397,10 +397,10 @@ export default defineCommand({
     console.log("  6. Create a policy for your email\n");
 
     try {
-      await open("https://one.dash.cloudflare.com");
-      consola.info("Opened Cloudflare Zero Trust dashboard in your browser.");
+      await open("https://dash.cloudflare.com");
+      consola.info("Opened Cloudflare dashboard in your browser.");
     } catch {
-      consola.info("Open https://one.dash.cloudflare.com to set up Access.");
+      consola.info("Open https://dash.cloudflare.com to set up Access.");
     }
 
     console.log(
