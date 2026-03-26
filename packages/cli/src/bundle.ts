@@ -9,7 +9,7 @@ function getCliDistDir(): string {
 }
 
 export function getWorkerBundlePath(): string {
-  const bundlePath = resolve(getCliDistDir(), "worker-bundle", "output");
+  const bundlePath = resolve(getCliDistDir(), "worker-bundle", "app-dist");
   if (!existsSync(bundlePath)) {
     throw new Error(
       `Worker bundle not found at ${bundlePath}. The CLI may not have been built correctly.`,

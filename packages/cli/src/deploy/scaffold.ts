@@ -28,7 +28,7 @@ export function scaffoldDeployDir(opts: ScaffoldOptions): ScaffoldResult {
 
   // Copy Worker bundle
   const workerPath = getWorkerBundlePath();
-  cpSync(workerPath, join(dir, ".output"), { recursive: true });
+  cpSync(workerPath, join(dir, "dist"), { recursive: true });
 
   // Copy migrations
   const migrationsPath = getMigrationsPath();
