@@ -1,1 +1,51 @@
 @import "tailwindcss";
+
+@theme {
+  --color-page-bg: #020617; /* slate-950 */
+  --color-surface: #0f172a; /* slate-900 */
+  --color-card: #1e293b; /* slate-800 */
+  --color-border: #334155; /* slate-700 */
+  --color-border-hover: #475569; /* slate-600 */
+
+  --color-text-primary: #f1f5f9; /* gray-100 */
+  --color-text-secondary: #9ca3af; /* gray-400 */
+  --color-text-muted: #6b7280; /* gray-500 */
+
+  --color-accent-emerald: #10b981; /* emerald-500 */
+  --color-accent-cyan: #06b6d4; /* cyan-500 */
+  --color-accent-amber: #f59e0b; /* amber-500 */
+  --color-accent-red: #f87171; /* red-400 */
+
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes blink-cursor {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.animate-blink {
+  animation: blink-cursor 1s step-end infinite;
+}

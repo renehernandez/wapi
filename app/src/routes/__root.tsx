@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useUserRoom } from "~/client/ws/useUserRoom";
+import { NavShell } from "~/components/ui/NavShell";
 import { getSessionFn } from "~/server/functions/session";
 import appCss from "~/styles/app.css?url";
 
@@ -14,7 +15,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "WAPI" },
+      { title: "wappy" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
@@ -29,7 +30,6 @@ function UserRoomListener({ accountId }: { accountId: string }) {
   const router = useRouter();
 
   useUserRoom(accountId, (notification) => {
-    // Re-fetch route data on any session mutation
     if (
       notification.type === "session_created" ||
       notification.type === "session_updated" ||
@@ -50,9 +50,11 @@ function RootComponent() {
       <head>
         <HeadContent />
       </head>
-      <body className="min-h-screen bg-gray-50 text-gray-900">
+      <body className="min-h-screen bg-slate-950 text-gray-100">
         {session && <UserRoomListener accountId={session.accountId} />}
-        <Outlet />
+        <NavShell userEmail={session?.email}>
+          <Outlet />
+        </NavShell>
         <Scripts />
       </body>
     </html>

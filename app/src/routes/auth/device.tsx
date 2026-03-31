@@ -23,6 +23,16 @@ export const Route = createFileRoute("/auth/device")({
   },
 });
 
+function CenteredCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-center min-h-[calc(100vh-3.5rem)] px-4">
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-sm w-full">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function DeviceAuthPage() {
   const data = Route.useLoaderData();
   const { session } = Route.useRouteContext();
@@ -32,38 +42,46 @@ function DeviceAuthPage() {
 
   if (!session) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500">Sign in via Cloudflare Access first.</p>
+      <div className="flex items-center justify-center min-h-[calc(100vh-3.5rem)]">
+        <p className="text-gray-500 text-sm font-mono">
+          &gt; Sign in via Cloudflare Access first.
+        </p>
       </div>
     );
   }
 
   if (!data.found) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500">Invalid or expired device code.</p>
+      <div className="flex items-center justify-center min-h-[calc(100vh-3.5rem)]">
+        <p className="text-gray-500 text-sm font-mono">
+          &gt; Invalid or expired device code.
+        </p>
       </div>
     );
   }
 
   if (result === "approved") {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <CenteredCard>
         <div className="text-center">
-          <p className="text-green-600 font-medium text-lg">Device approved!</p>
+          <p className="text-emerald-400 font-medium text-lg font-mono">
+            Device approved!
+          </p>
           <p className="text-sm text-gray-500 mt-2">
             You can close this window. The CLI will continue automatically.
           </p>
         </div>
-      </div>
+      </CenteredCard>
     );
   }
 
   if (result === "denied") {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-600 font-medium">Device denied.</p>
-      </div>
+      <CenteredCard>
+        <div className="text-center">
+          <p className="text-gray-400 font-medium font-mono">Device denied.</p>
+        </div>
+      </CenteredCard>
     );
   }
 
@@ -91,17 +109,15 @@ function DeviceAuthPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-sm w-full">
-        <DeviceApproval
-          code={search.code}
-          machineName={details.machineName}
-          expired={expired}
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          loading={loading}
-        />
-      </div>
-    </div>
+    <CenteredCard>
+      <DeviceApproval
+        code={search.code}
+        machineName={details.machineName}
+        expired={expired}
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        loading={loading}
+      />
+    </CenteredCard>
   );
 }

@@ -1,3 +1,5 @@
+import { relativeTime } from "~/lib/relativeTime";
+
 interface Device {
   id: string;
   name: string;
@@ -15,32 +17,44 @@ interface DeviceListProps {
 export function DeviceList({ devices, onRevoke, revoking }: DeviceListProps) {
   if (devices.length === 0) {
     return (
-      <p className="text-gray-500 text-sm">
-        No devices registered. Use the CLI to connect a device.
+      <p className="font-mono text-gray-500 text-sm py-4">
+        &gt; No devices registered. Use the CLI to connect a device.
       </p>
     );
   }
 
   return (
-    <ul className="divide-y divide-gray-200">
+    <ul className="space-y-2">
       {devices.map((device) => (
-        <li key={device.id} className="py-3 flex items-center justify-between">
-          <div>
-            <p className="font-medium text-sm">{device.name}</p>
-            <p className="text-xs text-gray-500">
-              {device.revokedAt
-                ? `Revoked ${new Date(device.revokedAt).toLocaleDateString()}`
-                : device.lastSeenAt
-                  ? `Last seen ${new Date(device.lastSeenAt).toLocaleString()}`
-                  : "Never connected"}
-            </p>
+        <li
+          key={device.id}
+          className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Status dot */}
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${device.revokedAt ? "bg-red-400" : "bg-emerald-500"}`}
+            />
+            <div className="min-w-0">
+              <p className="font-mono text-sm font-medium text-gray-100 truncate">
+                {device.name}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {device.revokedAt
+                  ? `Revoked ${relativeTime(device.revokedAt)}`
+                  : device.lastSeenAt
+                    ? `Last seen ${relativeTime(device.lastSeenAt)}`
+                    : "Never connected"}
+              </p>
+            </div>
           </div>
+
           {!device.revokedAt && (
             <button
               type="button"
               onClick={() => onRevoke(device.id)}
               disabled={revoking === device.id}
-              className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
+              className="text-xs text-gray-500 hover:text-red-400 disabled:opacity-40 transition-colors shrink-0 px-2 py-1 rounded border border-transparent hover:border-red-400/30"
             >
               {revoking === device.id ? "Revoking..." : "Revoke"}
             </button>
