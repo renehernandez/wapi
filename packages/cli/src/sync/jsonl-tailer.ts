@@ -42,6 +42,26 @@ export function parseClaudeJsonl(line: string): AgentMessage | null {
   }
 
   if (data.type === "user") {
+    // Subagent results: extract content from toolUseResult
+    const tur = data.toolUseResult;
+    if (tur?.status === "completed" && Array.isArray(tur.content)) {
+      const agentText = tur.content
+        .filter((b: any) => b.type === "text")
+        .map((b: any) => b.text as string)
+        .join("");
+      if (agentText) {
+        const metadata: Record<string, unknown> = { isAgentResult: true };
+        if (tur.agentType) metadata.agentType = tur.agentType;
+        if (tur.agentId) metadata.agentId = tur.agentId;
+        return {
+          type: "text",
+          role: "assistant",
+          content: agentText,
+          metadata,
+        };
+      }
+    }
+
     const content = data.message?.content;
     let text: string | null = null;
     if (typeof content === "string") {

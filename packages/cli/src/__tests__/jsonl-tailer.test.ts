@@ -218,6 +218,48 @@ describe("parseClaudeJsonl", () => {
     });
   });
 
+  it("extracts agent result from toolUseResult", () => {
+    const msg = parseClaudeJsonl(
+      JSON.stringify({
+        type: "user",
+        toolUseResult: {
+          status: "completed",
+          agentType: "glab-review",
+          agentId: "abc123",
+          content: [{ type: "text", text: "## MR Review\nLooks good." }],
+        },
+        message: {
+          content: [{ type: "tool_result", tool_use_id: "x", content: [] }],
+        },
+      }),
+    );
+    expect(msg).toEqual({
+      type: "text",
+      role: "assistant",
+      content: "## MR Review\nLooks good.",
+      metadata: {
+        isAgentResult: true,
+        agentType: "glab-review",
+        agentId: "abc123",
+      },
+    });
+  });
+
+  it("skips toolUseResult with non-completed status", () => {
+    const msg = parseClaudeJsonl(
+      JSON.stringify({
+        type: "user",
+        toolUseResult: { status: "pending" },
+        message: { content: "still waiting" },
+      }),
+    );
+    expect(msg).toEqual({
+      type: "text",
+      role: "user",
+      content: "still waiting",
+    });
+  });
+
   it("extracts isCommand metadata from command-message user message", () => {
     const msg = parseClaudeJsonl(
       JSON.stringify({

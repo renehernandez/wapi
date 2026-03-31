@@ -164,7 +164,7 @@ export function MessageBubble({
     return <ToolBubble content={content} seq={seq} />;
   }
 
-  // Check for collapsible meta messages (skills, task notifications)
+  // Check for collapsible meta messages (skills, task notifications, commands)
   const meta = parseMetadata(metadata);
   if (meta) {
     const label = getMetaLabel(meta);
@@ -176,6 +176,36 @@ export function MessageBubble({
           seq={seq}
           className="bg-slate-800/60 border border-slate-700 rounded-lg"
         />
+      );
+    }
+
+    // Agent results: short inline, long collapsed
+    if (meta.isAgentResult) {
+      const agentType = meta.agentType as string | undefined;
+      const agentLabel = `Agent: ${agentType || "subagent"}`;
+      if (content.length >= 500) {
+        return (
+          <MetaBubble
+            label={agentLabel}
+            content={content}
+            seq={seq}
+            className="bg-slate-800 border border-slate-700 rounded-lg rounded-bl-sm"
+          />
+        );
+      }
+      // Short agent output: inline with badge
+      return (
+        <div className="flex flex-col items-start">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs text-gray-600 font-mono">#{seq}</span>
+            <span className="text-[10px] font-mono text-cyan-500/70">
+              via {agentType || "subagent"}
+            </span>
+          </div>
+          <div className="bg-slate-800 border border-slate-700 rounded-lg rounded-bl-sm px-4 py-3 max-w-xl lg:max-w-3xl">
+            <MarkdownContent content={content} />
+          </div>
+        </div>
       );
     }
   }
