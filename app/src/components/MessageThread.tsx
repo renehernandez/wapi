@@ -6,6 +6,7 @@ interface Message {
   seq: number;
   role: string;
   content: string;
+  metadata?: string | null;
   createdAt: string;
 }
 
@@ -71,6 +72,7 @@ export function MessageThread({ messages }: MessageThreadProps) {
             role={msg.role}
             content={msg.content}
             seq={msg.seq}
+            metadata={msg.metadata}
           />
         ))}
         <div ref={bottomRef} />

@@ -1,7 +1,12 @@
 import type { ChildProcess } from "node:child_process";
 
 export type AgentMessage =
-  | { type: "text"; role: "user" | "assistant" | "system"; content: string }
+  | {
+      type: "text";
+      role: "user" | "assistant" | "system";
+      content: string;
+      metadata?: Record<string, unknown>;
+    }
   | { type: "tool_call"; name: string; input: unknown }
   | { type: "tool_result"; output: unknown }
   | { type: "thinking"; content: string }

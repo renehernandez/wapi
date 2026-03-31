@@ -185,4 +185,51 @@ describe("parseClaudeJsonl", () => {
       ),
     ).toBeNull();
   });
+
+  it("extracts isMeta metadata from user message", () => {
+    const msg = parseClaudeJsonl(
+      JSON.stringify({
+        type: "user",
+        isMeta: true,
+        message: { content: "skill prompt" },
+      }),
+    );
+    expect(msg).toEqual({
+      type: "text",
+      role: "user",
+      content: "skill prompt",
+      metadata: { isMeta: true },
+    });
+  });
+
+  it("extracts origin metadata from user message", () => {
+    const msg = parseClaudeJsonl(
+      JSON.stringify({
+        type: "user",
+        origin: { kind: "task-notification" },
+        message: { content: "task done" },
+      }),
+    );
+    expect(msg).toEqual({
+      type: "text",
+      role: "user",
+      content: "task done",
+      metadata: { origin: { kind: "task-notification" } },
+    });
+  });
+
+  it("does not include metadata when neither isMeta nor origin is present", () => {
+    const msg = parseClaudeJsonl(
+      JSON.stringify({
+        type: "user",
+        message: { content: "normal message" },
+      }),
+    );
+    expect(msg).toEqual({
+      type: "text",
+      role: "user",
+      content: "normal message",
+    });
+    expect(msg).not.toHaveProperty("metadata");
+  });
 });

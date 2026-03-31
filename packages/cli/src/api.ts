@@ -95,7 +95,7 @@ export function createApiClient(serverUrl: string, deviceToken?: string) {
 
     async addMessage(
       sessionId: string,
-      data: { role: string; content: string },
+      data: { role: string; content: string; metadata?: string },
     ): Promise<void> {
       await request("POST", "/api/messages", { sessionId, ...data });
     },

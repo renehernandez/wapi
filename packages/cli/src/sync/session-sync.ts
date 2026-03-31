@@ -61,10 +61,15 @@ export class SessionSync {
   private mapMessage(msg: AgentMessage): {
     role: "user" | "assistant" | "system" | "tool";
     content: string;
+    metadata?: string;
   } | null {
     switch (msg.type) {
       case "text":
-        return { role: msg.role, content: msg.content };
+        return {
+          role: msg.role,
+          content: msg.content,
+          ...(msg.metadata ? { metadata: JSON.stringify(msg.metadata) } : {}),
+        };
       case "tool_call":
         return {
           role: "tool",

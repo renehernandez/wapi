@@ -43,19 +43,28 @@ export function parseClaudeJsonl(line: string): AgentMessage | null {
 
   if (data.type === "user") {
     const content = data.message?.content;
+    let text: string | null = null;
     if (typeof content === "string") {
-      return { type: "text", role: "user", content };
-    }
-    if (Array.isArray(content)) {
-      const text = content
+      text = content;
+    } else if (Array.isArray(content)) {
+      const joined = content
         .filter((b: any) => b.type === "text")
         .map((b: any) => b.text as string)
         .join("");
-      if (text) {
-        return { type: "text", role: "user", content: text };
-      }
+      if (joined) text = joined;
     }
-    return null;
+    if (!text) return null;
+
+    const metadata: Record<string, unknown> = {};
+    if (data.isMeta) metadata.isMeta = true;
+    if (data.origin) metadata.origin = data.origin;
+
+    return {
+      type: "text",
+      role: "user",
+      content: text,
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+    };
   }
 
   if (data.type === "assistant") {
