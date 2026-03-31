@@ -109,7 +109,7 @@ export function MessageBubble({ role, content, seq }: MessageBubbleProps) {
       <div className="flex flex-col items-end">
         <span className="text-xs text-gray-600 mb-1 font-mono">#{seq}</span>
         <div className="bg-cyan-900/50 border border-cyan-800/40 rounded-lg rounded-br-sm px-4 py-3 max-w-xl lg:max-w-3xl">
-          <p className="text-sm text-gray-100 whitespace-pre-wrap">{content}</p>
+          <MarkdownContent content={content} />
         </div>
       </div>
     );
