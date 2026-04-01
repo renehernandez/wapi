@@ -1,4 +1,3 @@
-import { waitUntil } from "cloudflare:workers";
 import { and, asc, eq, gt } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { sessionMessages, sessions } from "../../../db/schema";
@@ -71,15 +70,13 @@ export async function addMessage(
     .set({ updatedAt: now })
     .where(eq(sessions.id, data.sessionId));
 
-  // Notify DOs (best-effort via waitUntil — keeps Worker alive without blocking response)
-  waitUntil(
+  // Notify DOs in parallel — awaited to ensure delivery before Worker exits
+  await Promise.all([
     notifyUserRoom(accountId, {
       type: "message_added",
       sessionId: data.sessionId,
       messageSeq: seq,
     }),
-  );
-  waitUntil(
     notifySessionRoom(data.sessionId, {
       type: "message",
       id: message.id,
@@ -89,7 +86,7 @@ export async function addMessage(
       metadata: message.metadata,
       createdAt: message.createdAt,
     }),
-  );
+  ]);
 
   return message;
 }

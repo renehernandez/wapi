@@ -1,4 +1,3 @@
-import { waitUntil } from "cloudflare:workers";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { sessionMessages, sessions } from "../../../db/schema";
@@ -44,13 +43,11 @@ export async function createSession(
   };
 
   await db.insert(sessions).values(session);
-  waitUntil(
-    notifyUserRoom(accountId, {
-      type: "session_created",
-      sessionId: id,
-      title: data.title ?? null,
-    }),
-  );
+  await notifyUserRoom(accountId, {
+    type: "session_created",
+    sessionId: id,
+    title: data.title ?? null,
+  });
   return session;
 }
 
@@ -144,13 +141,11 @@ export async function updateSession(
     throw new VersionConflictError();
   }
 
-  waitUntil(
-    notifyUserRoom(accountId, {
-      type: "session_updated",
-      sessionId,
-      status: data.status,
-    }),
-  );
+  await notifyUserRoom(accountId, {
+    type: "session_updated",
+    sessionId,
+    status: data.status,
+  });
   return getSession(sessionId, accountId, db);
 }
 
@@ -167,11 +162,9 @@ export async function deleteSession(
     .set({ status: "archived", seq, updatedAt: now })
     .where(and(eq(sessions.id, sessionId), eq(sessions.accountId, accountId)));
 
-  waitUntil(
-    notifyUserRoom(accountId, {
-      type: "session_updated",
-      sessionId,
-      status: "archived",
-    }),
-  );
+  await notifyUserRoom(accountId, {
+    type: "session_updated",
+    sessionId,
+    status: "archived",
+  });
 }
