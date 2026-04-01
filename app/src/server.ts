@@ -1,12 +1,12 @@
 import { env } from "cloudflare:workers";
-import handler, { createServerEntry } from "@tanstack/react-start/server-entry";
+import handler from "@tanstack/react-start/server-entry";
 import { routePartykitRequest } from "partyserver";
 
 export { UserRoom } from "./parties/user";
 export { SessionRoom } from "./parties/session";
 
-export default createServerEntry({
-  async fetch(request) {
+export default {
+  async fetch(request: Request) {
     // WebSocket upgrades → Durable Objects
     const partyResponse = await routePartykitRequest(
       request,
@@ -17,4 +17,4 @@ export default createServerEntry({
     // Everything else → TanStack Start (SSR + server functions)
     return handler.fetch(request);
   },
-});
+};
