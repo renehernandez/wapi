@@ -72,8 +72,18 @@ function SessionDetailPage() {
       metadata?: string | null;
       createdAt: string;
     }) => {
+      console.log("[SessionDetail] WS message received", msg.seq, msg.role);
       setLiveMessages((prev) => {
-        if (prev.some((m) => m.seq === msg.seq)) return prev;
+        if (prev.some((m) => m.seq === msg.seq)) {
+          console.log("[SessionDetail] Dedup: skipping seq", msg.seq);
+          return prev;
+        }
+        console.log(
+          "[SessionDetail] Adding live message seq",
+          msg.seq,
+          "total:",
+          prev.length + 1,
+        );
         return [...prev, msg];
       });
     },

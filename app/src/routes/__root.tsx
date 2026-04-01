@@ -35,6 +35,10 @@ function UserRoomListener({ accountId }: { accountId: string }) {
       notification.type === "session_updated" ||
       notification.type === "message_added"
     ) {
+      console.log(
+        "[UserRoomListener] Invalidating router for",
+        notification.type,
+      );
       router.invalidate();
     }
   });

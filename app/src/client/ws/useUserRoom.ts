@@ -23,9 +23,23 @@ export function useUserRoom(
       room: accountId,
     });
 
+    socket.onopen = () => {
+      console.log("[UserRoom] WebSocket connected", accountId);
+    };
+
+    socket.onclose = (event) => {
+      console.log(
+        "[UserRoom] WebSocket closed",
+        accountId,
+        event.code,
+        event.reason,
+      );
+    };
+
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data) as UserRoomNotification;
+        console.log("[UserRoom] Notification received", data.type);
         callbackRef.current(data);
       } catch {
         // Ignore unparseable messages

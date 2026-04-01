@@ -17,6 +17,10 @@ export class SessionRoom extends Server {
     // Server functions send full message content via HTTP POST
     if (request.method === "POST") {
       const body = await request.text();
+      const connections = [...this.getConnections()];
+      console.log(
+        `[SessionRoom] Broadcasting to ${connections.length} connections`,
+      );
       this.broadcast(body);
       return new Response("ok");
     }

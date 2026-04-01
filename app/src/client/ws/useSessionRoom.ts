@@ -28,9 +28,27 @@ export function useSessionRoom(
       room: sessionId,
     });
 
+    socket.onopen = () => {
+      console.log("[SessionRoom] WebSocket connected", sessionId);
+    };
+
+    socket.onclose = (event) => {
+      console.log(
+        "[SessionRoom] WebSocket closed",
+        sessionId,
+        event.code,
+        event.reason,
+      );
+    };
+
+    socket.onerror = (event) => {
+      console.error("[SessionRoom] WebSocket error", sessionId, event);
+    };
+
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data) as SessionRoomMessage;
+        console.log("[SessionRoom] Message received", data.type, data.seq);
         if (data.type === "message") {
           callbackRef.current(data);
         }
