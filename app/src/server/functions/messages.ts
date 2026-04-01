@@ -70,8 +70,9 @@ export async function addMessage(
     .set({ updatedAt: now })
     .where(eq(sessions.id, data.sessionId));
 
-  // Notify DOs in parallel — awaited to ensure delivery before Worker exits
-  await Promise.all([
+  // Notify DOs — uses ctx.waitUntil via AsyncLocalStorage when available,
+  // falls back to await if no execution context
+  const pending = [
     notifyUserRoom(accountId, {
       type: "message_added",
       sessionId: data.sessionId,
@@ -86,7 +87,10 @@ export async function addMessage(
       metadata: message.metadata,
       createdAt: message.createdAt,
     }),
-  ]);
+  ].filter(Boolean);
+  if (pending.length > 0) {
+    await Promise.all(pending);
+  }
 
   return message;
 }

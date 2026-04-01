@@ -43,11 +43,12 @@ export async function createSession(
   };
 
   await db.insert(sessions).values(session);
-  await notifyUserRoom(accountId, {
+  const p = notifyUserRoom(accountId, {
     type: "session_created",
     sessionId: id,
     title: data.title ?? null,
   });
+  if (p) await p;
   return session;
 }
 
@@ -141,11 +142,12 @@ export async function updateSession(
     throw new VersionConflictError();
   }
 
-  await notifyUserRoom(accountId, {
+  const p1 = notifyUserRoom(accountId, {
     type: "session_updated",
     sessionId,
     status: data.status,
   });
+  if (p1) await p1;
   return getSession(sessionId, accountId, db);
 }
 
@@ -162,9 +164,10 @@ export async function deleteSession(
     .set({ status: "archived", seq, updatedAt: now })
     .where(and(eq(sessions.id, sessionId), eq(sessions.accountId, accountId)));
 
-  await notifyUserRoom(accountId, {
+  const p2 = notifyUserRoom(accountId, {
     type: "session_updated",
     sessionId,
     status: "archived",
   });
+  if (p2) await p2;
 }
