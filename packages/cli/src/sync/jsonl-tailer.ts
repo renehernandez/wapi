@@ -4,8 +4,7 @@ import * as path from "node:path";
 import consola from "consola";
 import type { AgentMessage } from "../adapters/types";
 
-const POLL_INTERVAL_MS = 200;
-const POLL_TIMEOUT_MS = 30_000;
+const POLL_INTERVAL_MS = 500;
 const INTERNAL_TYPES = new Set([
   "file-history-snapshot",
   "queue-operation",
@@ -202,8 +201,6 @@ export class JsonlTailer {
   }
 
   private startPolling(): void {
-    const deadline = Date.now() + POLL_TIMEOUT_MS;
-
     this.pollTimer = setInterval(() => {
       if (this.stopped) {
         this.clearPollTimer();
@@ -213,14 +210,6 @@ export class JsonlTailer {
       if (fs.existsSync(this.filePath)) {
         this.clearPollTimer();
         this.startWatching();
-        return;
-      }
-
-      if (Date.now() >= deadline) {
-        this.clearPollTimer();
-        consola.warn(
-          `[jsonl-tailer] Session file did not appear within ${POLL_TIMEOUT_MS / 1000}s: ${this.filePath}`,
-        );
       }
     }, POLL_INTERVAL_MS);
   }
