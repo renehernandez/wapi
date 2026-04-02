@@ -2,7 +2,10 @@
   "name": "@wappy/app",
   "version": "0.0.1",
   "type": "module",
-  "files": ["dist", "db"],
+  "files": [
+    "dist",
+    "db"
+  ],
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -17,8 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tanstack/react-router": "^1.120.0",
-    "@tanstack/react-start": "^1.120.0",
+    "@react-router/cloudflare": "^7.13.2",
     "@wappy/wire": "workspace:*",
     "drizzle-orm": "^0.44.0",
     "nanoid": "^5.1.0",
@@ -27,6 +29,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
+    "react-router": "^7.13.2",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.0.2",
     "zod": "^3.24.0"
@@ -34,6 +37,8 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.0.0",
     "@cloudflare/vitest-pool-workers": "latest",
+    "@react-router/dev": "^7.13.2",
+    "@react-router/fs-routes": "^7.13.2",
     "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",

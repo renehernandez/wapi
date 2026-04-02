@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionRoom } from "~/client/ws/useSessionRoom";
 import { MessageThread } from "~/components/MessageThread";
 import { Badge } from "~/components/ui/Badge";
@@ -124,6 +124,32 @@ function SessionDetailPage() {
     handleWsConnect,
   );
 
+  // Poll for new messages as fallback when session is active
+  const maxSeqRef = useRef(0);
+  useEffect(() => {
+    if (!data.found || data.session.status !== "active") return;
+
+    const interval = setInterval(() => {
+      const afterSeq = maxSeqRef.current;
+      listMessagesFn({
+        data: { sessionId: params.sessionId, afterSeq },
+      }).then((msgs) => {
+        for (const msg of msgs) {
+          handleWsMessage({
+            id: msg.id,
+            seq: msg.seq,
+            role: msg.role,
+            content: msg.content,
+            metadata: msg.metadata,
+            createdAt: msg.createdAt,
+          });
+        }
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [data.found, data.found ? data.session.status : null, params.sessionId, handleWsMessage]);
+
   if (!data.found) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12">
@@ -149,6 +175,13 @@ function SessionDetailPage() {
       : 0;
   const newLiveMessages = liveMessages.filter((m) => m.seq > loaderMaxSeq);
   const allMessages = [...loaderMessages, ...newLiveMessages];
+
+  // Update maxSeqRef for polling
+  const currentMaxSeq =
+    allMessages.length > 0
+      ? Math.max(...allMessages.map((m) => m.seq))
+      : 0;
+  maxSeqRef.current = currentMaxSeq;
 
   const status = isValidStatus(session.status) ? session.status : "ended";
 
