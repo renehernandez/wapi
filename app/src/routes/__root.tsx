@@ -30,10 +30,11 @@ function UserRoomListener({ accountId }: { accountId: string }) {
   const router = useRouter();
 
   useUserRoom(accountId, (notification) => {
+    // Only invalidate for session-level changes (new session, status change).
+    // message_added is handled by SessionRoom WebSocket on the detail page.
     if (
       notification.type === "session_created" ||
-      notification.type === "session_updated" ||
-      notification.type === "message_added"
+      notification.type === "session_updated"
     ) {
       console.log(
         "[UserRoomListener] Invalidating router for",
