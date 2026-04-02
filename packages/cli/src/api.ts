@@ -100,6 +100,13 @@ export function createApiClient(serverUrl: string, deviceToken?: string) {
       await request("POST", "/api/messages", { sessionId, ...data });
     },
 
+    async addMessages(
+      sessionId: string,
+      messages: Array<{ role: string; content: string; metadata?: string }>,
+    ): Promise<void> {
+      await request("POST", "/api/messages/batch", { sessionId, messages });
+    },
+
     async updateSession(
       sessionId: string,
       data: { status?: string; expectedVersion: number },

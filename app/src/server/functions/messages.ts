@@ -91,6 +91,90 @@ export async function addMessage(
   return message;
 }
 
+export async function addMessages(
+  accountId: string,
+  data: {
+    sessionId: string;
+    messages: Array<{
+      role: "user" | "assistant" | "system" | "tool";
+      content: string;
+      metadata?: string;
+    }>;
+  },
+  db: Db,
+  r2: R2 = getR2(),
+) {
+  // Verify session belongs to account (once for the batch)
+  const session = await db
+    .select()
+    .from(sessions)
+    .where(
+      and(eq(sessions.id, data.sessionId), eq(sessions.accountId, accountId)),
+    )
+    .get();
+
+  if (!session) throw new Error("Session not found");
+
+  const now = new Date().toISOString();
+  const stored: MessageObject[] = [];
+
+  for (const msg of data.messages) {
+    const id = nanoid();
+    const seq = await nextMessageSeq(data.sessionId, db);
+    const accountSeq = await incrementSeq(accountId, db);
+
+    const message: MessageObject = {
+      id,
+      sessionId: data.sessionId,
+      seq,
+      role: msg.role,
+      content: msg.content,
+      metadata: msg.metadata ?? null,
+      accountSeq,
+      createdAt: now,
+    };
+
+    await putMessage(message, r2);
+    await db.insert(sessionMessages).values({
+      id,
+      sessionId: data.sessionId,
+      seq,
+      accountSeq,
+    });
+
+    stored.push(message);
+  }
+
+  // Update session's updatedAt once for the batch
+  await db
+    .update(sessions)
+    .set({ updatedAt: now })
+    .where(eq(sessions.id, data.sessionId));
+
+  // Notify DOs once for the batch — send the last message for SessionRoom
+  const lastMsg = stored[stored.length - 1];
+  await Promise.all([
+    notifyUserRoom(accountId, {
+      type: "message_added",
+      sessionId: data.sessionId,
+      messageSeq: lastMsg.seq,
+    }),
+    notifySessionRoom(data.sessionId, {
+      type: "messages_batch",
+      messages: stored.map((m) => ({
+        id: m.id,
+        seq: m.seq,
+        role: m.role,
+        content: m.content,
+        metadata: m.metadata,
+        createdAt: m.createdAt,
+      })),
+    }),
+  ]);
+
+  return stored;
+}
+
 export async function listMessages(
   accountId: string,
   options: { sessionId: string; afterSeq?: number; limit?: number },

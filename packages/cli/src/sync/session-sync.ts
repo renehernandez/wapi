@@ -2,10 +2,19 @@ import consola from "consola";
 import type { AgentMessage } from "../adapters/types";
 import type { ApiClient } from "../api";
 
+const FLUSH_INTERVAL_MS = 200;
+
 export class SessionSync {
   private sessionId: string | null = null;
   private sessionVersion = 1;
   private started = false;
+  private buffer: Array<{
+    role: "user" | "assistant" | "system" | "tool";
+    content: string;
+    metadata?: string;
+  }> = [];
+  private flushTimer: ReturnType<typeof setInterval> | null = null;
+  private flushing = false;
 
   constructor(
     private api: ApiClient,
@@ -25,6 +34,7 @@ export class SessionSync {
         this.sessionId = session.id;
         this.sessionVersion = session.version;
         consola.debug(`Session created: ${this.sessionId}`);
+        this.startFlushTimer();
       } catch (err) {
         consola.warn(
           `Failed to create session: ${err instanceof Error ? err.message : String(err)}`,
@@ -38,16 +48,13 @@ export class SessionSync {
     const mapped = this.mapMessage(msg);
     if (!mapped) return;
 
-    try {
-      await this.api.addMessage(this.sessionId, mapped);
-    } catch (err) {
-      consola.debug(
-        `Failed to sync message: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+    this.buffer.push(mapped);
   }
 
   async end(): Promise<void> {
+    this.stopFlushTimer();
+    await this.flush();
+
     if (!this.sessionId) return;
 
     try {
@@ -60,6 +67,44 @@ export class SessionSync {
       consola.debug(
         `Failed to end session: ${err instanceof Error ? err.message : String(err)}`,
       );
+    }
+  }
+
+  private startFlushTimer(): void {
+    this.flushTimer = setInterval(() => {
+      this.flush().catch((err) =>
+        consola.debug(
+          `Flush failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }, FLUSH_INTERVAL_MS);
+  }
+
+  private stopFlushTimer(): void {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+  }
+
+  private async flush(): Promise<void> {
+    if (this.flushing || this.buffer.length === 0 || !this.sessionId) return;
+
+    this.flushing = true;
+    const batch = this.buffer.splice(0);
+
+    try {
+      if (batch.length === 1) {
+        await this.api.addMessage(this.sessionId, batch[0]);
+      } else {
+        await this.api.addMessages(this.sessionId, batch);
+      }
+    } catch (err) {
+      consola.debug(
+        `Failed to sync ${batch.length} message(s): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      this.flushing = false;
     }
   }
 

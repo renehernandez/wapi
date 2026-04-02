@@ -11,6 +11,13 @@ export type SessionRoomMessage = {
   createdAt: string;
 };
 
+type SessionRoomBatch = {
+  type: "messages_batch";
+  messages: SessionRoomMessage[];
+};
+
+type SessionRoomEvent = SessionRoomMessage | SessionRoomBatch;
+
 export function useSessionRoom(
   sessionId: string | null,
   onMessage: (message: SessionRoomMessage) => void,
@@ -47,10 +54,14 @@ export function useSessionRoom(
 
     socket.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as SessionRoomMessage;
-        console.log("[SessionRoom] Message received", data.type, data.seq);
+        const data = JSON.parse(event.data) as SessionRoomEvent;
+        console.log("[SessionRoom] Event received", data.type);
         if (data.type === "message") {
           callbackRef.current(data);
+        } else if (data.type === "messages_batch") {
+          for (const msg of data.messages) {
+            callbackRef.current({ ...msg, type: "message" });
+          }
         }
       } catch {
         // Ignore unparseable messages

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionSync } from "../sync/session-sync";
 
 function createMockApi() {
@@ -9,7 +9,9 @@ function createMockApi() {
     revokeDevice: vi.fn(),
     createSession: vi.fn().mockResolvedValue({ id: "s-mock-123", version: 1 }),
     addMessage: vi.fn().mockResolvedValue(undefined),
+    addMessages: vi.fn().mockResolvedValue(undefined),
     updateSession: vi.fn().mockResolvedValue(undefined),
+    connect: vi.fn(),
   };
 }
 
@@ -18,8 +20,13 @@ describe("SessionSync", () => {
   let sync: SessionSync;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     api = createMockApi();
     sync = new SessionSync(api as any, "claude");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("creates session lazily on first message", async () => {
@@ -34,18 +41,64 @@ describe("SessionSync", () => {
       agentType: "claude",
       machineId: undefined,
     });
+
+    // Message is buffered, not sent yet
+    expect(api.addMessage).not.toHaveBeenCalled();
+
+    // Flush via timer
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Single message uses addMessage (not batch)
     expect(api.addMessage).toHaveBeenCalledWith("s-mock-123", {
       role: "assistant",
       content: "Hello",
     });
   });
 
-  it("does not create session twice", async () => {
-    await sync.handleMessage({ type: "text", role: "assistant", content: "A" });
-    await sync.handleMessage({ type: "text", role: "assistant", content: "B" });
+  it("batches multiple messages into a single addMessages call", async () => {
+    await sync.handleMessage({
+      type: "text",
+      role: "user",
+      content: "A",
+    });
+    await sync.handleMessage({
+      type: "text",
+      role: "assistant",
+      content: "B",
+    });
+    await sync.handleMessage({
+      type: "text",
+      role: "user",
+      content: "C",
+    });
 
     expect(api.createSession).toHaveBeenCalledOnce();
-    expect(api.addMessage).toHaveBeenCalledTimes(2);
+    expect(api.addMessage).not.toHaveBeenCalled();
+    expect(api.addMessages).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(api.addMessages).toHaveBeenCalledWith("s-mock-123", [
+      { role: "user", content: "A" },
+      { role: "assistant", content: "B" },
+      { role: "user", content: "C" },
+    ]);
+    expect(api.addMessage).not.toHaveBeenCalled();
+  });
+
+  it("does not create session twice", async () => {
+    await sync.handleMessage({
+      type: "text",
+      role: "assistant",
+      content: "A",
+    });
+    await sync.handleMessage({
+      type: "text",
+      role: "assistant",
+      content: "B",
+    });
+
+    expect(api.createSession).toHaveBeenCalledOnce();
   });
 
   it("maps tool_call to role=tool with JSON content", async () => {
@@ -54,6 +107,8 @@ describe("SessionSync", () => {
       name: "read_file",
       input: { path: "/foo" },
     });
+
+    await vi.advanceTimersByTimeAsync(200);
 
     const addCall = api.addMessage.mock.calls[0];
     expect(addCall[1].role).toBe("tool");
@@ -65,23 +120,39 @@ describe("SessionSync", () => {
   it("maps error to role=system", async () => {
     await sync.handleMessage({ type: "error", message: "Bad request" });
 
+    await vi.advanceTimersByTimeAsync(200);
+
     const addCall = api.addMessage.mock.calls[0];
     expect(addCall[1].role).toBe("system");
     expect(addCall[1].content).toContain("Bad request");
   });
 
   it("skips turn_complete (no server call)", async () => {
-    await sync.handleMessage({ type: "text", role: "assistant", content: "A" });
+    await sync.handleMessage({
+      type: "text",
+      role: "assistant",
+      content: "A",
+    });
     await sync.handleMessage({ type: "turn_complete" });
 
-    // createSession + 1 addMessage (turn_complete is skipped)
+    await vi.advanceTimersByTimeAsync(200);
+
     expect(api.addMessage).toHaveBeenCalledOnce();
   });
 
-  it("ends session on exit", async () => {
-    await sync.handleMessage({ type: "text", role: "assistant", content: "A" });
+  it("flushes buffer and ends session on end()", async () => {
+    await sync.handleMessage({
+      type: "text",
+      role: "assistant",
+      content: "A",
+    });
     await sync.end();
 
+    // Flush happened during end()
+    expect(api.addMessage).toHaveBeenCalledWith("s-mock-123", {
+      role: "assistant",
+      content: "A",
+    });
     expect(api.updateSession).toHaveBeenCalledWith("s-mock-123", {
       status: "ended",
       expectedVersion: 1,
@@ -92,23 +163,37 @@ describe("SessionSync", () => {
     api.createSession.mockRejectedValue(new Error("network error"));
 
     await expect(
-      sync.handleMessage({ type: "text", role: "assistant", content: "A" }),
+      sync.handleMessage({
+        type: "text",
+        role: "assistant",
+        content: "A",
+      }),
     ).resolves.not.toThrow();
 
-    // addMessage should not be called since session was not created
+    await vi.advanceTimersByTimeAsync(200);
+
     expect(api.addMessage).not.toHaveBeenCalled();
   });
 
   it("handles addMessage failure gracefully", async () => {
     api.addMessage.mockRejectedValue(new Error("server error"));
 
-    await expect(
-      sync.handleMessage({ type: "text", role: "assistant", content: "A" }),
-    ).resolves.not.toThrow();
+    await sync.handleMessage({
+      type: "text",
+      role: "assistant",
+      content: "A",
+    });
+
+    // Should not throw during flush
+    await vi.advanceTimersByTimeAsync(200);
   });
 
   it("handles end failure gracefully", async () => {
-    await sync.handleMessage({ type: "text", role: "assistant", content: "A" });
+    await sync.handleMessage({
+      type: "text",
+      role: "assistant",
+      content: "A",
+    });
     api.updateSession.mockRejectedValue(new Error("fail"));
 
     await expect(sync.end()).resolves.not.toThrow();
@@ -122,6 +207,8 @@ describe("SessionSync", () => {
       metadata: { isSubagent: true },
     });
 
+    await vi.advanceTimersByTimeAsync(200);
+
     const addCall = api.addMessage.mock.calls[0];
     expect(addCall[1].role).toBe("tool");
     expect(addCall[1].metadata).toBe(JSON.stringify({ isSubagent: true }));
@@ -133,6 +220,8 @@ describe("SessionSync", () => {
       output: "some output",
       metadata: { isSubagent: true },
     });
+
+    await vi.advanceTimersByTimeAsync(200);
 
     const addCall = api.addMessage.mock.calls[0];
     expect(addCall[1].role).toBe("tool");
@@ -146,6 +235,8 @@ describe("SessionSync", () => {
       input: { path: "/foo" },
     });
 
+    await vi.advanceTimersByTimeAsync(200);
+
     const addCall = api.addMessage.mock.calls[0];
     expect(addCall[1]).not.toHaveProperty("metadata");
   });
@@ -155,6 +246,8 @@ describe("SessionSync", () => {
       type: "tool_result",
       output: "output",
     });
+
+    await vi.advanceTimersByTimeAsync(200);
 
     const addCall = api.addMessage.mock.calls[0];
     expect(addCall[1]).not.toHaveProperty("metadata");
