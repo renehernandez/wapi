@@ -31,12 +31,12 @@
 
 ## 5. API Resource Routes
 
-- [ ] 5.1 Migrate `POST /api/sessions` → `api.sessions.ts` with `action` export
-- [ ] 5.2 Migrate `GET /api/sessions`, `POST /api/sessions/:id` → resource routes with `loader`/`action`
-- [ ] 5.3 Migrate `GET /api/messages`, `POST /api/messages` → `api.messages.ts` resource route
-- [ ] 5.4 Migrate `POST /api/messages/batch` → `api.messages.batch.ts` resource route
-- [ ] 5.5 Migrate device routes: `/api/devices`, `/api/devices/code`, `/api/devices/poll`, `/api/devices/revoke`
-- [ ] 5.6 Migrate `/api/connect` and `/api/sync` resource routes
+- [x] 5.1 Migrate `POST /api/sessions` → `api.sessions.ts` with `action` export
+- [x] 5.2 Migrate `GET /api/sessions`, `POST /api/sessions/:id` → resource routes with `loader`/`action`
+- [x] 5.3 Migrate `GET /api/messages`, `POST /api/messages` → `api.messages.ts` resource route
+- [x] 5.4 Migrate `POST /api/messages/batch` → `api.messages.batch.ts` resource route
+- [x] 5.5 Migrate device routes: `/api/devices`, `/api/devices/code`, `/api/devices/poll`, `/api/devices/revoke`
+- [x] 5.6 Migrate `/api/connect` and `/api/sync` resource routes
 - [ ] 5.7 All resource route actions/loaders SHALL extract `ctx` from `AppLoadContext` and pass to notify functions
 
 ## 6. DO Notifications
