@@ -174,6 +174,19 @@ function ToolBubble({
   try {
     const parsed = JSON.parse(content);
     if (parsed?.name) toolName = parsed.name;
+    // Enrich Agent/Skill labels with details from input
+    if (parsed?.name === "Agent" && parsed.input) {
+      const desc = parsed.input.description as string | undefined;
+      const agentType = parsed.input.subagent_type as string | undefined;
+      toolName = desc
+        ? `Agent: ${desc}`
+        : agentType
+          ? `Agent: ${agentType}`
+          : "Agent";
+    } else if (parsed?.name === "Skill" && parsed.input) {
+      const skill = parsed.input.skill as string | undefined;
+      toolName = skill ? `Skill: ${skill}` : "Skill";
+    }
     jsonContent = JSON.stringify(parsed, null, 2);
   } catch {
     // keep raw content
