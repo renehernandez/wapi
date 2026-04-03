@@ -23,6 +23,7 @@
     "@react-router/cloudflare": "^7.13.2",
     "@wappy/wire": "workspace:*",
     "drizzle-orm": "^0.44.0",
+    "isbot": "^5.1.37",
     "nanoid": "^5.1.0",
     "partyserver": "^0.0.60",
     "partysocket": "^1.1.0",
